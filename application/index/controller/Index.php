@@ -1,10 +1,92 @@
 <?php
 namespace app\index\controller;
 
-class Index
+use \think\Controller;
+use \think\Cache;
+class Index      extends Controller
 {
-    public function index()
-    {
-        return '<style type="text/css">*{ padding: 0; margin: 0; } .think_default_text{ padding: 4px 48px;} a{color:#2E5CD5;cursor: pointer;text-decoration: none} a:hover{text-decoration:underline; } body{ background: #fff; font-family: "Century Gothic","Microsoft yahei"; color: #333;font-size:18px} h1{ font-size: 100px; font-weight: normal; margin-bottom: 12px; } p{ line-height: 1.6em; font-size: 42px }</style><div style="padding: 24px 48px;"> <h1>:)</h1><p> ThinkPHP V5<br/><span style="font-size:30px">十年磨一剑 - 为API开发设计的高性能框架</span></p><span style="font-size:22px;">[ V5.0 版本由 <a href="http://www.qiniu.com" target="qiniu">七牛云</a> 独家赞助发布 ]</span></div><script type="text/javascript" src="https://tajs.qq.com/stats?sId=9347272" charset="UTF-8"></script><script type="text/javascript" src="https://e.topthink.com/Public/static/client.js"></script><think id="ad_bd568ce7058a1091"></think>';
+    public function index(){
+        header("Content-type:text/html;charset=utf-8");
+    	
+        $type=$this->types();
+
+        $this->assign('type',$type);
+   
+        return $this->fetch();
+    }
+
+
+    public function types(){
+        $options = [
+            'type'  =>  'Redis', // 缓存类型为File
+            'expire'=>  7200, // 缓存有效期为永久有效
+            'prefix'=>  '',//缓存的前缀
+          
+        ];
+        $redis=Cache::connect($options);
+      
+        if(!$redis->get('types')){
+            $m=db('goods_type');
+            $type=$m->where("pid=0")->select();//获取一级分类
+            $type2=array();
+            $type3=array();
+
+            foreach($type as $key=>$value){
+                $type[$key]['child']=array();//二级分类的名字
+                $type2=$m->where("pid=".$value['id'])->select();//获取二级分类
+
+                foreach($type2 as $k=>$v){
+                    
+                  
+
+                    array_push($type[$key]['child'],$v);//合并一级与二级分类
+                    $type[$key]['child'][$k]['child2']=array();////三级分类的名字
+                   
+                        $type3=$m->where("pid=".$v['id'])->select();//获取三级分类
+                        foreach($type3 as $v2){
+
+
+                              array_push($type[$key]['child'][$k]['child2'],$v2);//合并一级二级三级分类
+                        }
+                      
+                   
+                }
+
+            }
+            $redis->set('types',$type);
+            return $type;
+        }else{
+            return $redis->get('types');
+        }
+
+       
+       
+    }
+
+    public function lists(){
+        header("Content-type:text/html;charset=utf-8");
+        $m=db('goods');
+        $i=db('goods_files');
+        $data=$m->where("tid=".$_GET['id'].' or tpid='.$_GET['id'])->select();
+        $array=array();
+
+        foreach($data as $k=>$v){
+            $v['image']=array();//图片的名字
+            $imageId=explode(',',$v['imagepath']);
+           
+            foreach($imageId as $vid){
+                $img=$i->field('filepath')->where('id='.$vid)->find();
+                 array_push($v['image'],$img);
+            }
+            array_push($array,$v);
+        }
+        
+   
+        $this->assign('data',$array);
+        return $this->fetch();
+    }
+
+    public function details(){
+    	return $this->fetch();
     }
 }
